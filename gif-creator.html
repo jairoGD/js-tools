@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gerador de GIF (Local) — UI Renovada</title>
+  <!-- gifshot 0.3.2 is bundled next to this file for local use. -->
+  <script src="gifshot.min.js"></script>
+  <style>
+    :root{
+      --bg:#0b0d10; --card:#11161c; --muted:#8da0b3; --text:#eaf1f8; --accent:#4da3ff; --accent-2:#7c4dff;
+      --border:#223042; --chip:#17202b; --danger:#ff5a64; --ok:#33d69f;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text)}
+    .wrap{max-width:1000px; margin:32px auto; padding:0 16px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    h1{font-size:22px; margin:0; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:14px}
+
+    .grid{display:grid; grid-template-columns:1.1fr .9fr; gap:16px}
+    @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+
+    .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px}
+    .dropzone{border:2px dashed var(--border); border-radius:16px; padding:24px; display:grid; place-items:center; text-align:center; transition:.2s}
+    .dropzone.drag{border-color:var(--accent); box-shadow:0 0 0 4px #4da3ff22}
+    .btns{display:flex; flex-wrap:wrap; gap:10px}
+    .btn{background:var(--accent); color:#00162b; border:0; padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer}
+    .btn.secondary{background:#223042; color:var(--text)}
+    .btn.danger{background:var(--danger); color:#23060a}
+    .btn:disabled{opacity:.6; cursor:not-allowed}
+    .row{display:flex; gap:12px; align-items:center; flex-wrap:wrap}
+
+    .control{display:grid; gap:6px}
+    label{font-size:13px; color:var(--muted)}
+    input[type="number"], input[type="text"]{background:#0f141a; color:var(--text); border:1px solid var(--border); border-radius:12px; padding:10px 12px; width:100%}
+    input[type="range"]{width:100%; accent-color:var(--accent)}
+    .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+    .chip{background:var(--chip); color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:6px 10px; font-size:12px}
+
+    .thumbs{display:grid; grid-template-columns:repeat(auto-fill, minmax(88px,1fr)); gap:8px; margin-top:12px}
+    .thumb{position:relative; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#000}
+    .thumb img{width:100%; height:80px; object-fit:cover; display:block}
+    .thumb .rm{position:absolute; top:6px; right:6px; background:#0009; border:1px solid #fff3; color:#fff; font-size:12px; padding:2px 6px; border-radius:999px; cursor:pointer}
+    .muted{color:var(--muted)}
+
+    .preview{display:grid; gap:12px; justify-items:center}
+    .out{max-width:100%; height:auto; border-radius:12px; border:1px solid var(--border); background:#000}
+    .meta{font-size:13px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap}
+
+    .progress{display:flex; align-items:center; gap:10px; color:var(--muted)}
+    .spin{width:16px; height:16px; border:2px solid #4da3ff55; border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    .foot{display:flex; justify-content:space-between; align-items:center; margin-top:10px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Gerador de GIF (funciona local)</h1>
+        <div class="sub">Carregue imagens, ajuste a velocidade e gere um GIF. Visual e download instantâneos.</div>
+      </div>
+      <div class="chips">
+        <span class="chip">PNG/JPG</span>
+        <span class="chip">Sem servidor</span>
+        <span class="chip">gifshot</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Painel esquerdo: entrada e controles -->
+      <section class="card" id="left">
+        <div id="drop" class="dropzone" tabindex="0">
+          <div>
+            <div style="font-weight:700; margin-bottom:6px">Arraste suas imagens aqui</div>
+            <div class="muted" style="font-size:13px">ou</div>
+            <div style="height:8px"></div>
+            <div class="btns">
+              <label class="btn" for="imageInput">Selecionar arquivos</label>
+              <input id="imageInput" type="file" accept="image/*" multiple hidden>
+              <button id="clear" class="btn secondary" type="button">Limpar lista</button>
+            </div>
+            <div class="chips" id="stats" style="justify-content:center; margin-top:10px"></div>
+          </div>
+        </div>
+
+        <div style="height:12px"></div>
+        <div class="row">
+          <div class="control" style="flex:2">
+            <label>Velocidade — segundos por frame</label>
+            <input type="range" id="delayRange" min="0.02" max="1.5" value="0.2" step="0.02">
+          </div>
+          <div class="control" style="width:120px">
+            <label>&nbsp;</label>
+            <input type="number" id="delayInput" value="0.2" step="0.02" min="0.02" max="5">
+          </div>
+        </div>
+
+        <div class="foot">
+          <div class="progress" id="progress" style="visibility:hidden"><span class="spin"></span><span>Processando…</span></div>
+          <div class="btns">
+            <button id="make" class="btn" type="button" disabled>Gerar GIF</button>
+          </div>
+        </div>
+
+        <div class="thumbs" id="thumbs"></div>
+      </section>
+
+      <!-- Painel direito: prévia e download -->
+      <section class="card">
+        <div class="preview">
+          <img id="out" class="out" alt="Prévia do GIF" />
+          <div class="meta" id="meta">Nenhum GIF gerado ainda.</div>
+          <div class="btns">
+            <a id="download" class="btn secondary" href="#" download="gif-custom-size.gif" style="display:none">Baixar GIF</a>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    // Elements
+    const input = document.getElementById('imageInput');
+    const drop = document.getElementById('drop');
+    const thumbs = document.getElementById('thumbs');
+    const stats = document.getElementById('stats');
+    const delayRange = document.getElementById('delayRange');
+    const delayInput = document.getElementById('delayInput');
+    const makeBtn = document.getElementById('make');
+    const clearBtn = document.getElementById('clear');
+    const progress = document.getElementById('progress');
+    const out = document.getElementById('out');
+    const meta = document.getElementById('meta');
+    const dl = document.getElementById('download');
+
+    // State
+    let files = []; // File[]
+    let images = []; // dataURLs paralelos a files
+    let width = 0, height = 0;
+
+    // Delay binding (range <-> number)
+    const syncDelay = (fromRange) => {
+      if (fromRange) delayInput.value = Number(delayRange.value).toFixed(2);
+      else delayRange.value = delayInput.value;
+    };
+    delayRange.addEventListener('input', () => syncDelay(true));
+    delayInput.addEventListener('input', () => syncDelay(false));
+
+    // Helpers
+    function setProcessing(on){ progress.style.visibility = on ? 'visible' : 'hidden'; makeBtn.disabled = on || images.length === 0; }
+    function refreshStats(){
+      stats.innerHTML = '';
+      const chip1 = document.createElement('span'); chip1.className='chip'; chip1.textContent = images.length + ' imagem(ns)';
+      const chip2 = document.createElement('span'); chip2.className='chip'; chip2.textContent = width && height ? (width+' × '+height) : '—';
+      stats.appendChild(chip1); stats.appendChild(chip2);
+    }
+    function refreshThumbs(){
+      thumbs.innerHTML = '';
+      images.forEach((src, i) => {
+        const wrap = document.createElement('div'); wrap.className='thumb';
+        const img = document.createElement('img'); img.src = src;
+        const rm = document.createElement('button'); rm.className='rm'; rm.type='button'; rm.textContent='remover';
+        rm.addEventListener('click', () => { images.splice(i,1); files.splice(i,1); if(images.length===0){width=height=0;} refreshThumbs(); refreshStats(); makeBtn.disabled = images.length===0; });
+        wrap.appendChild(img); wrap.appendChild(rm);
+        thumbs.appendChild(wrap);
+      });
+    }
+
+    // DnD
+    const stop = (e)=>{ e.preventDefault(); e.stopPropagation(); };
+    ['dragenter','dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, stop, false));
+    drop.addEventListener('dragenter', ()=> drop.classList.add('drag'));
+    drop.addEventListener('dragleave', ()=> drop.classList.remove('drag'));
+    drop.addEventListener('drop', (e)=>{ drop.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+    // File input
+    input.addEventListener('change', (e)=> handleFiles(e.target.files));
+    clearBtn.addEventListener('click', ()=>{ files=[]; images=[]; width=height=0; refreshThumbs(); refreshStats(); makeBtn.disabled=true; out.removeAttribute('src'); meta.textContent='Nenhum GIF gerado ainda.'; dl.style.display='none'; });
+
+    // Loader
+    function handleFiles(list){
+      if(!list || !list.length) return;
+      const arr = Array.from(list).filter(f=>/^image\//.test(f.type));
+      if(arr.length===0) return;
+      files.push(...arr);
+      const readers = arr.map((f, idx)=> new Promise((res)=>{
+        const r = new FileReader(); r.onload = (ev)=> res({ idx, src: ev.target.result }); r.readAsDataURL(f);
+      }));
+      Promise.all(readers).then(entries=>{
+        entries.forEach(({src})=> images.push(src));
+        // define dimensões pela primeira imagem do conjunto total
+        if(images.length>0 && (!width||!height)){
+          const tmp = new Image(); tmp.onload = ()=>{ width = tmp.naturalWidth; height = tmp.naturalHeight; refreshStats(); }; tmp.src = images[0];
+        }
+        refreshThumbs(); refreshStats(); makeBtn.disabled = images.length===0;
+      });
+    }
+
+    // The GIF encoder is bundled with this repository.
+    function ensureGifshot(){
+      return window.gifshot && window.gifshot.createGIF
+        ? Promise.resolve()
+        : Promise.reject(new Error('gifshot.min.js não está disponível'));
+    }
+
+    // Generate
+    makeBtn.addEventListener('click', async ()=>{
+      if(images.length===0){ alert('Selecione ao menos uma imagem.'); return; }
+      const delay = Math.max(0.01, parseFloat(delayInput.value)||0.2);
+      setProcessing(true); meta.textContent='Gerando…'; dl.style.display='none';
+      try{
+        await ensureGifshot();
+        window.gifshot.createGIF({
+          images: images,
+          interval: delay,           // segundos por frame
+          gifWidth: width||undefined,
+          gifHeight: height||undefined
+        }, (obj)=>{
+          setProcessing(false);
+          if(!obj.error){
+            out.src = obj.image;
+            meta.textContent = `Frames: ${images.length} · Dimensões: ${width||'—'} × ${height||'—'} · Delay: ${delay}s`;
+            dl.href = obj.image; dl.style.display='inline-block';
+          } else {
+            meta.textContent = 'Erro ao gerar o GIF.';
+          }
+        });
+      } catch(err){
+        setProcessing(false);
+        meta.textContent = 'gifshot.min.js não está disponível nesta pasta.';
+        console.error(err);
+      }
+    });
+  })();
+  </script>
+</body>
+</html>
