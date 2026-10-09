@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gerador de GIF (Local) — UI Renovada</title>
+  <title>GIF Creator — Local Tool</title>
   <!-- gifshot 0.3.2 is bundled next to this file for local use. -->
   <script src="gifshot.min.js"></script>
   <style>
@@ -60,28 +60,28 @@
   <div class="wrap">
     <header>
       <div>
-        <h1>Gerador de GIF (funciona local)</h1>
-        <div class="sub">Carregue imagens, ajuste a velocidade e gere um GIF. Visual e download instantâneos.</div>
+        <h1>GIF Creator</h1>
+        <div class="sub">Add images, adjust the frame delay, and create a GIF. Preview and download it right away.</div>
       </div>
       <div class="chips">
         <span class="chip">PNG/JPG</span>
-        <span class="chip">Sem servidor</span>
+        <span class="chip">No server required</span>
         <span class="chip">gifshot</span>
       </div>
     </header>
 
     <div class="grid">
-      <!-- Painel esquerdo: entrada e controles -->
+      <!-- Input and controls -->
       <section class="card" id="left">
         <div id="drop" class="dropzone" tabindex="0">
           <div>
-            <div style="font-weight:700; margin-bottom:6px">Arraste suas imagens aqui</div>
-            <div class="muted" style="font-size:13px">ou</div>
+            <div style="font-weight:700; margin-bottom:6px">Drop your images here</div>
+            <div class="muted" style="font-size:13px">or</div>
             <div style="height:8px"></div>
             <div class="btns">
-              <label class="btn" for="imageInput">Selecionar arquivos</label>
+              <label class="btn" for="imageInput">Choose files</label>
               <input id="imageInput" type="file" accept="image/*" multiple hidden>
-              <button id="clear" class="btn secondary" type="button">Limpar lista</button>
+              <button id="clear" class="btn secondary" type="button">Clear list</button>
             </div>
             <div class="chips" id="stats" style="justify-content:center; margin-top:10px"></div>
           </div>
@@ -90,7 +90,7 @@
         <div style="height:12px"></div>
         <div class="row">
           <div class="control" style="flex:2">
-            <label>Velocidade — segundos por frame</label>
+            <label>Frame delay — seconds per frame</label>
             <input type="range" id="delayRange" min="0.02" max="1.5" value="0.2" step="0.02">
           </div>
           <div class="control" style="width:120px">
@@ -100,22 +100,22 @@
         </div>
 
         <div class="foot">
-          <div class="progress" id="progress" style="visibility:hidden"><span class="spin"></span><span>Processando…</span></div>
+          <div class="progress" id="progress" style="visibility:hidden"><span class="spin"></span><span>Processing…</span></div>
           <div class="btns">
-            <button id="make" class="btn" type="button" disabled>Gerar GIF</button>
+            <button id="make" class="btn" type="button" disabled>Create GIF</button>
           </div>
         </div>
 
         <div class="thumbs" id="thumbs"></div>
       </section>
 
-      <!-- Painel direito: prévia e download -->
+      <!-- Preview and download -->
       <section class="card">
         <div class="preview">
-          <img id="out" class="out" alt="Prévia do GIF" />
-          <div class="meta" id="meta">Nenhum GIF gerado ainda.</div>
+          <img id="out" class="out" alt="GIF preview" />
+          <div class="meta" id="meta">No GIF created yet.</div>
           <div class="btns">
-            <a id="download" class="btn secondary" href="#" download="gif-custom-size.gif" style="display:none">Baixar GIF</a>
+            <a id="download" class="btn secondary" href="#" download="gif-custom-size.gif" style="display:none">Download GIF</a>
           </div>
         </div>
       </section>
@@ -140,7 +140,7 @@
 
     // State
     let files = []; // File[]
-    let images = []; // dataURLs paralelos a files
+    let images = []; // Data URLs matching files
     let width = 0, height = 0;
 
     // Delay binding (range <-> number)
@@ -155,7 +155,7 @@
     function setProcessing(on){ progress.style.visibility = on ? 'visible' : 'hidden'; makeBtn.disabled = on || images.length === 0; }
     function refreshStats(){
       stats.innerHTML = '';
-      const chip1 = document.createElement('span'); chip1.className='chip'; chip1.textContent = images.length + ' imagem(ns)';
+      const chip1 = document.createElement('span'); chip1.className='chip'; chip1.textContent = images.length + (images.length === 1 ? ' image' : ' images');
       const chip2 = document.createElement('span'); chip2.className='chip'; chip2.textContent = width && height ? (width+' × '+height) : '—';
       stats.appendChild(chip1); stats.appendChild(chip2);
     }
@@ -164,7 +164,7 @@
       images.forEach((src, i) => {
         const wrap = document.createElement('div'); wrap.className='thumb';
         const img = document.createElement('img'); img.src = src;
-        const rm = document.createElement('button'); rm.className='rm'; rm.type='button'; rm.textContent='remover';
+        const rm = document.createElement('button'); rm.className='rm'; rm.type='button'; rm.textContent='remove'; rm.setAttribute('aria-label', 'Remove image');
         rm.addEventListener('click', () => { images.splice(i,1); files.splice(i,1); if(images.length===0){width=height=0;} refreshThumbs(); refreshStats(); makeBtn.disabled = images.length===0; });
         wrap.appendChild(img); wrap.appendChild(rm);
         thumbs.appendChild(wrap);
@@ -180,7 +180,7 @@
 
     // File input
     input.addEventListener('change', (e)=> handleFiles(e.target.files));
-    clearBtn.addEventListener('click', ()=>{ files=[]; images=[]; width=height=0; refreshThumbs(); refreshStats(); makeBtn.disabled=true; out.removeAttribute('src'); meta.textContent='Nenhum GIF gerado ainda.'; dl.style.display='none'; });
+    clearBtn.addEventListener('click', ()=>{ files=[]; images=[]; width=height=0; refreshThumbs(); refreshStats(); makeBtn.disabled=true; out.removeAttribute('src'); meta.textContent='No GIF created yet.'; dl.style.display='none'; });
 
     // Loader
     function handleFiles(list){
@@ -193,7 +193,7 @@
       }));
       Promise.all(readers).then(entries=>{
         entries.forEach(({src})=> images.push(src));
-        // define dimensões pela primeira imagem do conjunto total
+        // Use the first image to set the output dimensions.
         if(images.length>0 && (!width||!height)){
           const tmp = new Image(); tmp.onload = ()=>{ width = tmp.naturalWidth; height = tmp.naturalHeight; refreshStats(); }; tmp.src = images[0];
         }
@@ -205,34 +205,34 @@
     function ensureGifshot(){
       return window.gifshot && window.gifshot.createGIF
         ? Promise.resolve()
-        : Promise.reject(new Error('gifshot.min.js não está disponível'));
+        : Promise.reject(new Error('gifshot.min.js is unavailable'));
     }
 
     // Generate
     makeBtn.addEventListener('click', async ()=>{
-      if(images.length===0){ alert('Selecione ao menos uma imagem.'); return; }
+      if(images.length===0){ alert('Select at least one image.'); return; }
       const delay = Math.max(0.01, parseFloat(delayInput.value)||0.2);
-      setProcessing(true); meta.textContent='Gerando…'; dl.style.display='none';
+      setProcessing(true); meta.textContent='Creating GIF…'; dl.style.display='none';
       try{
         await ensureGifshot();
         window.gifshot.createGIF({
           images: images,
-          interval: delay,           // segundos por frame
+          interval: delay,           // seconds per frame
           gifWidth: width||undefined,
           gifHeight: height||undefined
         }, (obj)=>{
           setProcessing(false);
           if(!obj.error){
             out.src = obj.image;
-            meta.textContent = `Frames: ${images.length} · Dimensões: ${width||'—'} × ${height||'—'} · Delay: ${delay}s`;
+            meta.textContent = `Frames: ${images.length} · Size: ${width||'—'} × ${height||'—'} · Delay: ${delay}s`;
             dl.href = obj.image; dl.style.display='inline-block';
           } else {
-            meta.textContent = 'Erro ao gerar o GIF.';
+            meta.textContent = 'Could not create the GIF.';
           }
         });
       } catch(err){
         setProcessing(false);
-        meta.textContent = 'gifshot.min.js não está disponível nesta pasta.';
+        meta.textContent = 'gifshot.min.js is missing from this folder.';
         console.error(err);
       }
     });
