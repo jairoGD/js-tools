@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>JS Tools — GIF Tools</title>
+  <title>JS Tools — Image and Animation Tools</title>
   <style>
     :root { color-scheme: dark; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; background: #0b0d10; color: #eaf1f8; }
     * { box-sizing: border-box; }
@@ -18,7 +18,6 @@
     .tool h2 { margin: 0; font-size: 1.45rem; }
     .tool p { margin: 0; color: #a8b8c9; line-height: 1.55; }
     .tool span { margin-top: auto; color: #62b5ff; font-weight: 700; }
-    footer { margin-top: 30px; color: #8da0b3; font-size: .9rem; }
     @media (max-width: 650px) { .tools { grid-template-columns: 1fr; } .tool { min-height: 190px; } }
   </style>
 </head>
@@ -26,7 +25,7 @@
   <main>
     <div class="eyebrow">JS Tools</div>
     <h1>Choose a tool</h1>
-    <p class="intro">Convert SWF animations to GIF or create a GIF from your images. Everything is processed in your browser.</p>
+    <p class="intro">Create GIFs and sprite sheets, extract GIF frames, or convert SWF animations.</p>
     <nav class="tools" aria-label="Available tools">
       <a class="tool" href="swf-to-gif.html">
         <h2>SWF to GIF</h2>
@@ -38,8 +37,17 @@
         <p>Select images, adjust the frame delay, and download an animated GIF.</p>
         <span>Open creator →</span>
       </a>
+      <a class="tool" href="sprite-generator.html">
+        <h2>Sprite Sheet Generator</h2>
+        <p>Arrange images in a grid and export a sprite sheet with frame data.</p>
+        <span>Open generator →</span>
+      </a>
+      <a class="tool" href="gif-frame-extractor.html">
+        <h2>GIF Frame Extractor</h2>
+        <p>Browse the frames of a GIF and download any frame as a PNG.</p>
+        <span>Open extractor →</span>
+      </a>
     </nav>
-    <footer>You can also download the repository and open index.html locally.</footer>
   </main>
 </body>
 </html>

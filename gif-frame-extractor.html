@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GIF Frame Extractor</title>
+  <style>
+    :root { --bg:#0b0d10; --card:#11161c; --muted:#7f8ea3; --text:#e9eef5; --accent:#4da3ff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 960px; margin: 32px auto; padding: 0 16px; }
+    h1 { font-weight: 700; font-size: 24px; margin: 0 0 16px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+
+    .dropzone {
+      border: 2px dashed #2a3340; border-radius: 14px; padding: 28px; transition: .2s ease;
+      background: var(--card); display: flex; align-items: center; justify-content: center; text-align: center;
+    }
+    .dropzone.drag { border-color: var(--accent); box-shadow: 0 0 0 4px #4da3ff22; }
+    .muted { color: var(--muted); }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .row > * { flex: 1 1 auto; }
+    .controls { background: var(--card); padding: 16px; border-radius: 14px; display: grid; gap: 12px; }
+
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    .meta { font-size: 14px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+    button, label.btn {
+      background: var(--accent); color: #00162b; border: 0; padding: 10px 14px; border-radius: 12px; font-weight: 700; cursor: pointer;
+    }
+    button.secondary { background: #223042; color: var(--text); }
+    .preview { background: var(--card); border-radius: 14px; padding: 16px; display: grid; justify-items: center; }
+    .preview img { max-width: 100%; height: auto; image-rendering: pixelated; border-radius: 8px; background: #000; }
+    .hidden { display: none !important; }
+    .spacer { height: 8px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>GIF Frame Extractor</h1>
+    <div class="grid">
+      <div id="drop" class="dropzone" tabindex="0">
+        <div>
+          <div style="font-weight:700; margin-bottom:6px">Drag a GIF here</div>
+          <div class="muted">or</div>
+          <div class="spacer"></div>
+          <label class="btn" for="file">Choose file</label>
+          <input id="file" type="file" accept="image/gif" class="hidden" />
+          <div class="spacer"></div>
+          <div class="muted" style="font-size:13px">Use the slider to browse frames and save any frame as a PNG.</div>
+        </div>
+      </div>
+
+      <div id="controls" class="controls hidden">
+        <div class="row">
+          <input id="timeline" type="range" min="0" max="0" value="0" step="1" />
+        </div>
+        <div class="meta">
+          <div><strong>Frame:</strong> <span id="frameIdx">0</span>/<span id="frameTotal">0</span></div>
+          <div><strong>Dimensions:</strong> <span id="dims">—</span></div>
+          <div><strong>Frame duration:</strong> <span id="dur">—</span></div>
+        </div>
+        <div class="row">
+          <button id="saveOne">Download current frame (PNG)</button>
+          <button id="reset" class="secondary">Load another GIF</button>
+        </div>
+      </div>
+
+      <div class="preview hidden" id="preview">
+        <img id="out" alt="Current GIF frame" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Decode GIF frames with WebCodecs (ImageDecoder). -->
+  <script>
+(() => {
+  const drop = document.getElementById('drop');
+  const fileInput = document.getElementById('file');
+  const controls = document.getElementById('controls');
+  const slider = document.getElementById('timeline');
+  const frameIdxEl = document.getElementById('frameIdx');
+  const frameTotalEl = document.getElementById('frameTotal');
+  const dimsEl = document.getElementById('dims');
+  const durEl = document.getElementById('dur');
+  const preview = document.getElementById('preview');
+  const outImg = document.getElementById('out');
+  const btnSaveOne = document.getElementById('saveOne');
+  const btnReset = document.getElementById('reset');
+
+  let decoder = null;
+  let frameCount = 0;
+  let width = 0, height = 0;
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  function supportCheck() {
+    if (!('ImageDecoder' in window)) {
+      const warn = document.createElement('div');
+      warn.className = 'muted';
+      warn.style.marginTop = '8px';
+      warn.textContent = 'Your browser does not support WebCodecs/ImageDecoder. Use a recent version of Chrome or Edge.';
+      document.querySelector('#drop > div').appendChild(warn);
+      return false;
+    }
+    return true;
+  }
+
+  async function drawFrame(i) {
+    if (!decoder) return;
+    i = Math.max(0, Math.min(i, frameCount - 1));
+    // Decode the requested frame as a VideoFrame.
+    const { image } = await decoder.decode({ frameIndex: i, completeFramesOnly: true });
+    const durationMs = image.duration ? Math.round(image.duration / 1000) : 0; // microseconds to milliseconds
+
+    // Convert to an ImageBitmap for drawing on the canvas.
+    const bitmap = await createImageBitmap(image);
+    width = image.displayWidth;
+    height = image.displayHeight;
+
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width; canvas.height = height;
+    }
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(bitmap, 0, 0);
+
+    // Release resources.
+    bitmap.close();
+    image.close();
+
+    // Update the UI.
+    const url = canvas.toDataURL('image/png');
+    outImg.src = url;
+    frameIdxEl.textContent = i;
+    frameTotalEl.textContent = frameCount - 1;
+    dimsEl.textContent = width + ' × ' + height;
+    durEl.textContent = durationMs + ' ms';
+    slider.value = i;
+  }
+
+  function resetAll() {
+    try { decoder && decoder.close && decoder.close(); } catch (e) {}
+    decoder = null;
+    frameCount = 0;
+    outImg.removeAttribute('src');
+    controls.classList.add('hidden');
+    preview.classList.add('hidden');
+    drop.classList.remove('hidden');
+    drop.focus();
+  }
+
+  async function handleFile(file) {
+    if (!file || (file.type && file.type !== 'image/gif')) { alert('Choose a .gif file.'); return; }
+    if (!supportCheck()) return;
+
+    const ab = await file.arrayBuffer();
+    // Create a native GIF decoder.
+    try {
+      decoder = new ImageDecoder({ data: new Uint8Array(ab), type: 'image/gif' });
+      await decoder.tracks.ready;
+      const track = decoder.tracks.selectedTrack;
+      frameCount = track.frameCount || 1;
+
+      // Initialize the UI.
+      slider.min = 0;
+      slider.max = Math.max(0, frameCount - 1);
+      slider.value = 0;
+
+      drop.classList.add('hidden');
+      controls.classList.remove('hidden');
+      preview.classList.remove('hidden');
+
+      await drawFrame(0);
+    } catch (err) {
+      console.error('Failed to initialize ImageDecoder:', err);
+      alert('This browser could not decode the GIF.');
+    }
+  }
+
+  // DnD
+  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+  ['dragenter','dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, stop, false));
+  drop.addEventListener('dragenter', () => drop.classList.add('drag'));
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', (e) => {
+    drop.classList.remove('drag');
+    const file = e.dataTransfer.files && e.dataTransfer.files[0];
+    handleFile(file);
+  });
+
+  // File input
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    handleFile(file);
+  });
+
+  // Slider and save button
+  slider.addEventListener('input', (e) => drawFrame(parseInt(e.target.value, 10) || 0));
+
+  btnSaveOne.addEventListener('click', () => {
+    if (!frameCount) return;
+    const i = parseInt(slider.value, 10) || 0;
+    // The canvas already contains the displayed frame.
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png');
+    a.download = `frame_${String(i).padStart(3,'0')}.png`;
+    document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  btnReset.addEventListener('click', resetAll);
+
+  // Check browser support on load.
+  supportCheck();
+})();
+</script>
+</body>
+</html>

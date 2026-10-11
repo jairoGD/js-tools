@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sprite Sheet Generator</title>
+  <style>
+    :root{
+      --bg:#0b0d10; --card:#11161c; --muted:#8da0b3; --text:#eaf1f8; --accent:#4da3ff; --border:#223042; --chip:#17202b; --danger:#ff5a64;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; background:var(--bg); color:var(--text)}
+    .wrap{max-width:1100px; margin:32px auto; padding:0 16px}
+    header{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px}
+    h1{font-size:22px; margin:0; letter-spacing:.2px}
+    .sub{color:var(--muted); font-size:14px}
+    .chips{display:flex; gap:8px; flex-wrap:wrap}
+    .chip{background:var(--chip); color:var(--muted); border:1px solid var(--border); border-radius:999px; padding:6px 10px; font-size:12px}
+
+    .grid{display:grid; grid-template-columns:1.2fr .8fr; gap:16px}
+    @media (max-width:980px){ .grid{grid-template-columns:1fr} }
+
+    .card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px}
+    .dropzone{border:2px dashed var(--border); border-radius:16px; padding:24px; display:grid; place-items:center; text-align:center; transition:.2s}
+    .dropzone.drag{border-color:var(--accent); box-shadow:0 0 0 4px #4da3ff22}
+
+    .row{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+    .col2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+
+    .btn{background:var(--accent); color:#00162b; border:0; padding:10px 14px; border-radius:12px; font-weight:700; cursor:pointer}
+    .btn.secondary{background:#223042; color:var(--text)}
+    .btn.danger{background:var(--danger); color:#23060a}
+    .btn:disabled{opacity:.6; cursor:not-allowed}
+
+    .control{display:grid; gap:6px; min-width:140px}
+    label{font-size:13px; color:var(--muted)}
+    input[type="number"], select, input[type="text"]{background:#0f141a; color:var(--text); border:1px solid var(--border); border-radius:12px; padding:10px 12px; width:100%}
+    input[type="range"]{width:100%; accent-color:var(--accent)}
+    input[type="color"]{appearance:none; border:none; background:none; width:40px; height:40px; padding:0; border-radius:8px; overflow:hidden}
+
+    .thumbs{display:grid; grid-template-columns:repeat(auto-fill, minmax(104px,1fr)); gap:8px; margin-top:12px}
+    .thumb{position:relative; border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#000; cursor:grab}
+    .thumb.dragging{opacity:.5}
+    .thumb img{width:100%; height:92px; object-fit:cover; display:block}
+    .thumb .rm{position:absolute; top:6px; right:6px; background:#0009; border:1px solid #fff3; color:#fff; font-size:12px; padding:2px 6px; border-radius:999px; cursor:pointer}
+    .thumb .handle{position:absolute; left:6px; top:6px; font-size:12px; background:#0009; border:1px solid #fff3; color:#fff; padding:2px 6px; border-radius:999px}
+
+    .meta{font-size:13px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap}
+    .out{max-width:100%; height:auto; border-radius:12px; border:1px solid var(--border); background:#000}
+
+    .progress{display:flex; align-items:center; gap:10px; color:var(--muted)}
+    .spin{width:16px; height:16px; border:2px solid #4da3ff55; border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+
+    canvas{max-width:100%}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Sprite Sheet Generator</h1>
+        <div class="sub">Add images, set the columns and rows, and export an aligned sprite sheet.</div>
+      </div>
+      <div class="chips">
+        <span class="chip">PNG/JPG</span>
+        <span class="chip">Numeric sorting</span>
+        <span class="chip">Drag to reorder</span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- Left panel: images, sorting, layout -->
+      <section class="card">
+        <div id="drop" class="dropzone" tabindex="0">
+          <div>
+            <div style="font-weight:700; margin-bottom:6px">Drag your images here</div>
+            <div class="meta">or</div>
+            <div class="row" style="justify-content:center; margin-top:8px">
+              <label class="btn" for="inputImages">Choose files</label>
+              <input id="inputImages" type="file" accept="image/*" multiple hidden />
+              <button id="clear" class="btn secondary" type="button">Clear list</button>
+            </div>
+            <div id="stats" class="meta" style="justify-content:center; margin-top:10px"></div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <div class="control" style="min-width:200px">
+            <label>Sort order</label>
+            <select id="sortMode">
+              <option value="num-asc">Number in filename (ascending)</option>
+              <option value="num-desc">Number in filename (descending)</option>
+              <option value="name-asc">Name A→Z</option>
+              <option value="name-desc">Name Z→A</option>
+              <option value="manual">Manual (drag to reorder)</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Columns</label>
+            <input type="number" id="cols" value="4" min="1" />
+          </div>
+          <div class="control">
+            <label>Rows</label>
+            <input type="number" id="rows" value="2" min="1" />
+          </div>
+          <div class="control" style="min-width:160px">
+            <label>&nbsp;</label>
+            <button id="autoGrid" class="btn secondary" type="button">Auto fit grid</button>
+          </div>
+        </div>
+
+        <div class="col2" style="margin-top:12px">
+          <div class="control">
+            <label>Frame size</label>
+            <select id="sizeMode">
+              <option value="first">Use first image</option>
+              <option value="max">Use largest dimensions</option>
+              <option value="min">Use smallest dimensions</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Image fit</label>
+            <select id="fitMode">
+              <option value="stretch">Stretch (ignore aspect ratio)</option>
+              <option value="contain" selected>Contain (letterbox)</option>
+              <option value="cover">Cover (may crop)</option>
+            </select>
+          </div>
+          <div class="control">
+            <label>Gutter (px between cells)</label>
+            <input type="number" id="gutter" value="0" min="0" step="1" />
+          </div>
+          <div class="control">
+            <label>Background</label>
+            <div class="row" style="align-items:center">
+              <input type="color" id="bgColor" value="#000000" />
+              <input type="range" id="bgAlpha" min="0" max="1" step="0.01" value="0" />
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px; justify-content:space-between">
+          <div class="progress" id="progress" style="visibility:hidden"><span class="spin"></span><span>Processing…</span></div>
+          <div class="row">
+            <button id="generate" class="btn" type="button" disabled>Generate Sprite Sheet</button>
+          </div>
+        </div>
+
+        <div id="thumbs" class="thumbs"></div>
+      </section>
+
+      <!-- Right panel: preview and downloads -->
+      <section class="card">
+        <div class="row" style="justify-content:center">
+          <canvas id="spriteCanvas"></canvas>
+        </div>
+        <div class="meta" id="meta" style="margin-top:10px">No preview yet.</div>
+        <div class="row" style="margin-top:10px">
+          <a id="downloadPng" class="btn secondary" href="#" download="sprite_sheet.png" style="display:none">Download PNG</a>
+          <a id="downloadJson" class="btn secondary" href="#" download="sprite_sheet.json" style="display:none">Download JSON</a>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    // Elements
+    const input = document.getElementById('inputImages');
+    const drop = document.getElementById('drop');
+    const thumbs = document.getElementById('thumbs');
+    const stats = document.getElementById('stats');
+    const sortMode = document.getElementById('sortMode');
+    const colsEl = document.getElementById('cols');
+    const rowsEl = document.getElementById('rows');
+    const autoGridBtn = document.getElementById('autoGrid');
+    const sizeMode = document.getElementById('sizeMode');
+    const fitMode = document.getElementById('fitMode');
+    const gutterEl = document.getElementById('gutter');
+    const bgColor = document.getElementById('bgColor');
+    const bgAlpha = document.getElementById('bgAlpha');
+    const generateBtn = document.getElementById('generate');
+    const progress = document.getElementById('progress');
+    const meta = document.getElementById('meta');
+    const canvas = document.getElementById('spriteCanvas');
+    const ctx = canvas.getContext('2d');
+    const dlPng = document.getElementById('downloadPng');
+    const dlJson = document.getElementById('downloadJson');
+
+    // State: items = [{name, src, img, w, h}]
+    let items = [];
+    let frameW = 0, frameH = 0;
+
+    // Helpers
+    const showProcessing = (on) => progress.style.visibility = on ? 'visible' : 'hidden';
+    const enableGenerate = () => generateBtn.disabled = items.length === 0;
+
+    function hexToRgb(hex){
+      const v = hex.replace('#','');
+      const bigint = parseInt(v, 16);
+      if (v.length === 3){
+        const r = (bigint >> 8) & 0xF; const g = (bigint >> 4) & 0xF; const b = bigint & 0xF;
+        return { r: (r<<4)|r, g: (g<<4)|g, b: (b<<4)|b };
+      }
+      const r = (bigint >> 16) & 255; const g = (bigint >> 8) & 255; const b = bigint & 255;
+      return { r, g, b };
+    }
+
+    function refreshStats(){
+      stats.innerHTML = '';
+      const chip1 = document.createElement('span'); chip1.className='chip'; chip1.textContent = items.length + (items.length === 1 ? ' image' : ' images');
+      const chip2 = document.createElement('span'); chip2.className='chip'; chip2.textContent = frameW && frameH ? (frameW+' × '+frameH) : '—';
+      stats.appendChild(chip1); stats.appendChild(chip2);
+    }
+
+    function computeFrameSize(){
+      if(items.length === 0){ frameW = frameH = 0; return; }
+      if(sizeMode.value === 'first'){
+        frameW = items[0].w; frameH = items[0].h;
+      } else if (sizeMode.value === 'max'){
+        frameW = items.reduce((m,it)=> Math.max(m, it.w), 0);
+        frameH = items.reduce((m,it)=> Math.max(m, it.h), 0);
+      } else if (sizeMode.value === 'min'){
+        frameW = items.reduce((m,it)=> Math.min(m, it.w), items[0].w);
+        frameH = items.reduce((m,it)=> Math.min(m, it.h), items[0].h);
+      }
+      refreshStats();
+    }
+
+    function renderThumbs(){
+      thumbs.innerHTML = '';
+      items.forEach((it, idx)=>{
+        const t = document.createElement('div'); t.className='thumb'; t.draggable = true; t.dataset.index = idx;
+        const h = document.createElement('span'); h.className='handle'; h.textContent = '#'+(idx+1);
+        const img = document.createElement('img'); img.src = it.src; img.alt = it.name;
+        const rm = document.createElement('button'); rm.className='rm'; rm.type='button'; rm.textContent='Remove';
+        rm.addEventListener('click', ()=>{ items.splice(idx,1); computeFrameSize(); renderThumbs(); refreshStats(); enableGenerate(); });
+
+        // Drag handlers
+        t.addEventListener('dragstart', (e)=>{ t.classList.add('dragging'); e.dataTransfer.setData('text/plain', String(idx)); });
+        t.addEventListener('dragend', ()=> t.classList.remove('dragging'));
+        t.addEventListener('dragover', (e)=> e.preventDefault());
+        t.addEventListener('drop', (e)=>{
+          e.preventDefault();
+          const from = parseInt(e.dataTransfer.getData('text/plain'),10);
+          const to = idx;
+          if (from === to) return;
+          const [moved] = items.splice(from,1);
+          items.splice(to,0,moved);
+          renderThumbs();
+        });
+
+        t.appendChild(img); t.appendChild(h); t.appendChild(rm);
+        thumbs.appendChild(t);
+      });
+    }
+
+    function sortItems(){
+      if (sortMode.value === 'manual') return; // keep the manual order
+      const reNum = /\d+/;
+      items.sort((a,b)=>{
+        if (sortMode.value === 'num-asc'){
+          const na = parseInt((a.name.match(reNum)||['0'])[0],10);
+          const nb = parseInt((b.name.match(reNum)||['0'])[0],10);
+          return na - nb;
+        }
+        if (sortMode.value === 'num-desc'){
+          const na = parseInt((a.name.match(reNum)||['0'])[0],10);
+          const nb = parseInt((b.name.match(reNum)||['0'])[0],10);
+          return nb - na;
+        }
+        if (sortMode.value === 'name-asc') return a.name.localeCompare(b.name);
+        if (sortMode.value === 'name-desc') return b.name.localeCompare(a.name);
+        return 0;
+      });
+    }
+
+    function autoGrid(){
+      const n = items.length || 1;
+      const c = Math.ceil(Math.sqrt(n));
+      const r = Math.ceil(n / c);
+      colsEl.value = c; rowsEl.value = r;
+    }
+
+    function drawFit(img, dx, dy, dw, dh, mode){
+      if (mode === 'stretch') { ctx.drawImage(img, dx, dy, dw, dh); return; }
+      const iw = img.naturalWidth || img.width; const ih = img.naturalHeight || img.height;
+      if (mode === 'contain'){
+        const s = Math.min(dw/iw, dh/ih);
+        const w = Math.round(iw*s), h = Math.round(ih*s);
+        const x = dx + Math.floor((dw - w)/2);
+        const y = dy + Math.floor((dh - h)/2);
+        ctx.drawImage(img, x, y, w, h);
+        return;
+      }
+      // cover
+      const s = Math.max(dw/iw, dh/ih);
+      const w = Math.round(iw*s), h = Math.round(ih*s);
+      const x = dx + Math.floor((dw - w)/2);
+      const y = dy + Math.floor((dh - h)/2);
+      ctx.drawImage(img, x, y, w, h);
+    }
+
+    function rgbaFromInputs(){
+      const {r,g,b} = hexToRgb(bgColor.value);
+      const a = parseFloat(bgAlpha.value)||0;
+      return `rgba(${r}, ${g}, ${b}, ${a})`;
+    }
+
+    function generate(){
+      if (items.length === 0) { alert('No images loaded!'); return; }
+      const cols = Math.max(1, parseInt(colsEl.value,10)||1);
+      const rows = Math.max(1, parseInt(rowsEl.value,10)||1);
+      if (cols * rows < items.length) { alert('The grid does not have enough cells for all images!'); return; }
+
+      computeFrameSize();
+      const gutter = Math.max(0, parseInt(gutterEl.value,10)||0);
+
+      const totalW = cols * frameW + (cols-1) * gutter;
+      const totalH = rows * frameH + (rows-1) * gutter;
+      canvas.width = totalW; canvas.height = totalH;
+
+      // Background
+      ctx.save();
+      ctx.fillStyle = rgbaFromInputs();
+      ctx.fillRect(0,0,totalW,totalH);
+      ctx.restore();
+
+      const fm = fitMode.value;
+      let map = [];
+      items.forEach((it, i)=>{
+        const c = i % cols;
+        const r = Math.floor(i / cols);
+        const x = c * (frameW + gutter);
+        const y = r * (frameH + gutter);
+        drawFit(it.img, x, y, frameW, frameH, fm);
+        map.push({ index:i, name:it.name, col:c, row:r, x, y, w:frameW, h:frameH });
+      });
+
+      // Update output details
+      meta.textContent = `Dimensions: ${totalW} × ${totalH} | Cell: ${frameW} × ${frameH} | Grid: ${cols}×${rows} | Frames: ${items.length}`;
+      dlPng.href = canvas.toDataURL('image/png');
+      dlPng.style.display = 'inline-block';
+      const blob = new Blob([JSON.stringify({ cols, rows, frameWidth:frameW, frameHeight:frameH, gutter, frames: map }, null, 2)], {type:'application/json'});
+      dlJson.href = URL.createObjectURL(blob);
+      dlJson.style.display = 'inline-block';
+    }
+
+    // File handling
+    function handleFiles(fileList){
+      if(!fileList || !fileList.length) return;
+      const files = Array.from(fileList).filter(f=>/^image\//.test(f.type));
+      if(files.length===0) return;
+
+      showProcessing(true);
+      const loaders = files.map(f => new Promise((resolve)=>{
+        const r = new FileReader();
+        r.onload = (ev)=>{
+          const img = new Image();
+          img.onload = ()=> resolve({ name: f.name, src: ev.target.result, img, w: img.naturalWidth, h: img.naturalHeight });
+          img.src = ev.target.result;
+        };
+        r.readAsDataURL(f);
+      }));
+
+      Promise.all(loaders).then(list=>{
+        // Append new images
+        items = items.concat(list);
+
+        // Sort using the current mode (numeric by default)
+        sortItems();
+        computeFrameSize();
+        renderThumbs();
+        refreshStats();
+        enableGenerate();
+        showProcessing(false);
+      });
+    }
+
+    // Events
+    input.addEventListener('change', (e)=> handleFiles(e.target.files));
+    sortMode.addEventListener('change', ()=>{ sortItems(); renderThumbs(); });
+    autoGridBtn.addEventListener('click', autoGrid);
+    sizeMode.addEventListener('change', ()=>{ computeFrameSize(); refreshStats(); });
+
+    const stop = (e)=>{ e.preventDefault(); e.stopPropagation(); };
+    ['dragenter','dragover','dragleave','drop'].forEach(ev => drop.addEventListener(ev, stop, false));
+    drop.addEventListener('dragenter', ()=> drop.classList.add('drag'));
+    drop.addEventListener('dragleave', ()=> drop.classList.remove('drag'));
+    drop.addEventListener('drop', (e)=>{ drop.classList.remove('drag'); handleFiles(e.dataTransfer.files); });
+
+    document.getElementById('clear').addEventListener('click', ()=>{
+      items = []; frameW = frameH = 0; renderThumbs(); refreshStats(); enableGenerate();
+      ctx.clearRect(0,0,canvas.width,canvas.height); meta.textContent='No preview yet.';
+      dlPng.style.display='none'; dlJson.style.display='none';
+    });
+
+    generateBtn.addEventListener('click', generate);
+  })();
+  </script>
+</body>
+</html>
